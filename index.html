@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Roster — Metro Strategy</title>
+<style>
+:root {
+  --navy:    #1a2e4a;
+  --navy2:   #243d63;
+  --accent:  #2e86de;
+  --green:   #27ae60;
+  --red:     #e74c3c;
+  --orange:  #e67e22;
+  --purple:  #8e44ad;
+  --teal:    #16a085;
+  --gold:    #f39c12;
+  --blue-sub:#daeaf7;
+  --lavender:#e8d5f5;
+  --row-alt: #f7f9fc;
+  --border:  #e0e6ed;
+  --card-shadow: 0 4px 20px rgba(0,0,0,.10);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,"Helvetica Neue",sans-serif; background:#f0f4f8; min-height:100vh; color:#1a2e4a; }
+
+/* ── Loading ── */
+#loadingScreen { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--navy); flex-direction:column; gap:18px; }
+#loadingScreen h2 { color:#fff; font-size:1.2rem; font-weight:600; }
+.spinner { width:44px; height:44px; border:4px solid rgba(255,255,255,.2); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Topbar ── */
+.topbar {
+  background:var(--navy); color:#fff;
+  padding:0 24px; height:56px; display:flex; align-items:center;
+  justify-content:space-between; position:sticky; top:0; z-index:200;
+  box-shadow:0 2px 16px rgba(0,0,0,.25);
+}
+.topbar-left { display:flex; align-items:center; gap:14px; }
+.topbar-title { font-size:1rem; font-weight:800; letter-spacing:.3px; }
+.topbar-sub   { font-size:.72rem; opacity:.6; font-weight:500; }
+.sync-badge { font-size:.68rem; padding:3px 10px; border-radius:20px; font-weight:700; background:rgba(255,255,255,.12); }
+.sync-badge.syncing { background:#f39c12; }
+.sync-badge.saved   { background:var(--green); }
+.sync-badge.error   { background:var(--red); }
+.topbar-actions { display:flex; gap:8px; align-items:center; }
+.back-btn { display:none; align-items:center; gap:6px; background:rgba(255,255,255,.12); border:none; color:#fff; padding:6px 14px; border-radius:8px; font-size:.82rem; font-weight:700; cursor:pointer; transition:background .15s; }
+.back-btn:hover { background:rgba(255,255,255,.22); }
+
+/* ── Buttons ── */
+.btn { padding:7px 14px; border:none; border-radius:8px; font-size:.8rem; font-weight:700; cursor:pointer; transition:opacity .15s,transform .1s; display:inline-flex; align-items:center; gap:5px; }
+.btn:hover  { opacity:.85; }
+.btn:active { transform:scale(.97); }
+.btn-green  { background:var(--green);  color:#fff; }
+.btn-red    { background:var(--red);    color:#fff; }
+.btn-orange { background:var(--orange); color:#fff; }
+.btn-navy   { background:var(--navy2);  color:#fff; }
+.btn-gray   { background:#7f8c8d;       color:#fff; }
+.btn-purple { background:var(--purple); color:#fff; }
+.btn-teal   { background:var(--teal);   color:#fff; }
+.btn-accent { background:var(--accent); color:#fff; }
+.btn-sm     { padding:5px 10px; font-size:.75rem; border-radius:6px; }
+
+/* ══════════════════════════════════════════
+   METRO DASHBOARD
+══════════════════════════════════════════ */
+#dashScreen { display:none; }
+.dash-header { padding:32px 28px 16px; }
+.dash-header h2 { font-size:1.5rem; font-weight:900; color:var(--navy); }
+.dash-header p  { font-size:.85rem; color:#6b7a8d; margin-top:4px; }
+
+.metro-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(320px,1fr));
+  gap:20px;
+  padding:8px 28px 40px;
+}
+
+.metro-card {
+  background:#fff;
+  border-radius:16px;
+  box-shadow:var(--card-shadow);
+  overflow:hidden;
+  cursor:pointer;
+  transition:transform .2s, box-shadow .2s;
+  border:2px solid transparent;
+}
+.metro-card:hover {
+  transform:translateY(-4px);
+  box-shadow:0 10px 36px rgba(0,0,0,.15);
+  border-color:var(--accent);
+}
+.metro-card-header {
+  padding:20px 22px 16px;
+  display:flex; align-items:flex-start; justify-content:space-between;
+}
+.metro-icon { font-size:2rem; margin-bottom:6px; }
+.metro-name { font-size:1.1rem; font-weight:900; color:#fff; }
+.metro-store-count { font-size:.75rem; color:rgba(255,255,255,.75); margin-top:2px; }
+.metro-arrow { font-size:1.2rem; color:rgba(255,255,255,.6); margin-top:4px; }
+
+/* Metro colour themes */
+.metro-houston  .metro-card-header { background:linear-gradient(135deg,#1a2e4a,#2e86de); }
+.metro-austin   .metro-card-header { background:linear-gradient(135deg,#134e4a,#0d9488); }
+.metro-sa       .metro-card-header { background:linear-gradient(135deg,#581c87,#7c3aed); }
+.metro-dfw      .metro-card-header { background:linear-gradient(135deg,#7c2d12,#ea580c); }
+.metro-arizona  .metro-card-header { background:linear-gradient(135deg,#713f12,#ca8a04); }
+
+.metro-card-body { padding:16px 22px 20px; }
+.metro-stores-list { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.store-chip { font-size:.72rem; background:#f0f4f8; color:var(--navy2); padding:3px 10px; border-radius:20px; font-weight:600; border:1px solid var(--border); }
+
+.metro-stats { display:flex; gap:12px; }
+.mstat { flex:1; text-align:center; background:#f8fafc; border-radius:10px; padding:8px 6px; }
+.mstat-num { font-size:1.2rem; font-weight:900; color:var(--navy2); }
+.mstat-num.over { color:var(--red); }
+.mstat-num.full { color:var(--green); }
+.mstat-lbl { font-size:.62rem; color:#94a3b8; margin-top:1px; }
+
+.metro-card-footer {
+  padding:10px 22px;
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.open-metro-btn { font-size:.78rem; font-weight:700; color:var(--accent); background:none; border:none; cursor:pointer; display:flex; align-items:center; gap:4px; }
+.hold-pill { font-size:.68rem; background:var(--lavender); color:var(--purple); padding:2px 8px; border-radius:10px; font-weight:700; }
+
+/* ══════════════════════════════════════════
+   METRO DETAIL (Store columns)
+══════════════════════════════════════════ */
+#metroScreen { display:none; }
+.metro-detail-header {
+  padding:18px 24px 12px;
+  display:flex; align-items:center; gap:16px;
+  border-bottom:1px solid var(--border);
+  background:#fff;
+}
+.metro-detail-badge {
+  color:#fff; padding:6px 16px; border-radius:20px; font-size:.82rem; font-weight:800;
+}
+.metro-detail-title { font-size:1.1rem; font-weight:900; color:var(--navy); }
+.metro-detail-sub   { font-size:.75rem; color:#94a3b8; margin-top:2px; }
+.metro-detail-actions { margin-left:auto; display:flex; gap:8px; }
+
+/* Refresh bar */
+.refresh-bar { padding:4px 24px; background:#e8f4fd; font-size:.7rem; color:#2980b9; display:flex; align-items:center; justify-content:space-between; }
+.refresh-bar button { background:none; border:none; color:#2980b9; font-size:.7rem; cursor:pointer; font-weight:700; }
+
+/* Stats row */
+.statsbar { display:flex; gap:10px; padding:12px 24px; flex-wrap:wrap; overflow-x:auto; }
+.stat-card { background:#fff; border-radius:10px; padding:8px 14px; box-shadow:0 2px 8px rgba(0,0,0,.07); text-align:center; min-width:110px; flex-shrink:0; }
+.stat-loc  { font-size:.65rem; font-weight:800; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100px; }
+.stat-frac { font-size:1.1rem; font-weight:900; color:var(--navy2); line-height:1.2; }
+.stat-frac.full { color:var(--green); }
+.stat-frac.over { color:var(--red); }
+.stat-lbl  { font-size:.6rem; color:#94a3b8; }
+
+/* Store grid */
+.grid-wrap { overflow-x:auto; padding:0 24px 24px; }
+.store-grid { display:grid; gap:14px; min-width:600px; }
+
+/* Location card */
+.loc-card { background:#fff; border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.08); overflow:hidden; display:flex; flex-direction:column; }
+.loc-header { color:#fff; text-align:center; padding:10px 8px; font-weight:800; font-size:.85rem; letter-spacing:.3px; }
+.metro-houston  .loc-header { background:linear-gradient(90deg,#1a2e4a,#2e86de); }
+.metro-austin   .loc-header { background:linear-gradient(90deg,#134e4a,#0d9488); }
+.metro-sa       .loc-header { background:linear-gradient(90deg,#581c87,#7c3aed); }
+.metro-dfw      .loc-header { background:linear-gradient(90deg,#7c2d12,#ea580c); }
+.metro-arizona  .loc-header { background:linear-gradient(90deg,#713f12,#ca8a04); }
+
+/* Sort bar */
+.sort-bar { display:flex; gap:4px; padding:5px 8px; background:var(--blue-sub); border-bottom:1px solid var(--border); align-items:center; }
+.sort-bar span { font-size:.65rem; font-weight:700; color:#555; flex:1; }
+.sort-btn { background:none; border:none; cursor:pointer; font-size:.67rem; color:#94a3b8; padding:2px 5px; border-radius:4px; }
+.sort-btn:hover  { background:#dde; color:#333; }
+.sort-btn.active { color:var(--navy); font-weight:800; }
+
+/* Person row */
+.person-row { display:grid; grid-template-columns:1fr auto; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .12s; }
+.person-row:nth-child(even) { background:var(--row-alt); }
+.person-row:hover { background:#e8f2fb; }
+.person-name { font-size:.82rem; font-weight:600; color:#1a2e4a; }
+.person-note-icon { font-size:.65rem; color:var(--purple); margin-left:3px; }
+.date-badge { font-size:.7rem; color:#fff; background:var(--navy2); border-radius:6px; padding:2px 8px; font-weight:700; white-space:nowrap; }
+.empty-col  { padding:16px; font-size:.75rem; color:#bbb; text-align:center; }
+
+/* Headcount bar */
+.hc-bar { padding:10px; border-top:2px solid #e0e6ed; background:#f8fafc; margin-top:auto; }
+.hc-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.hc-fraction { font-size:1rem; font-weight:900; color:var(--navy2); }
+.hc-fraction.full { color:var(--green); }
+.hc-fraction.over { color:var(--red); }
+.hc-lbl { font-size:.62rem; color:#94a3b8; }
+.progress-bar  { height:5px; background:#e2e8f0; border-radius:4px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:4px; transition:width .4s; background:var(--accent); }
+.progress-fill.full { background:var(--green); }
+.progress-fill.over { background:var(--red); }
+
+/* Add btn */
+.add-row-btn { margin:8px; width:calc(100% - 16px); padding:7px; background:#f5f7fa; border:2px dashed #c5cfe0; border-radius:8px; color:#94a3b8; font-size:.75rem; font-weight:700; cursor:pointer; text-align:center; transition:all .15s; }
+.add-row-btn:hover { background:#e8f0fb; border-color:var(--accent); color:var(--accent); }
+
+/* HOLD section */
+.hold-section { padding:0 24px 24px; }
+.hold-header-bar { background:var(--navy); color:#fff; text-align:center; padding:12px; border-radius:12px 12px 0 0; font-size:.95rem; font-weight:800; letter-spacing:2px; }
+.hold-grid-wrap { overflow-x:auto; }
+.hold-grid { display:grid; gap:12px; background:#c8cfe0; padding:12px; border-radius:0 0 12px 12px; min-width:400px; }
+.hold-card { background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+.hold-card-header { background:var(--navy); color:#fff; text-align:center; padding:7px; font-size:.72rem; font-weight:700; }
+.hold-person { display:grid; grid-template-columns:1fr auto; align-items:center; padding:7px 10px; background:var(--lavender); border-bottom:1px solid #ddd; gap:4px; cursor:pointer; transition:filter .12s; }
+.hold-person:hover { filter:brightness(.95); }
+.hold-name { font-size:.8rem; font-weight:600; }
+.hold-date { font-size:.65rem; color:#888; }
+.empty-hold { color:#bbb; font-size:.72rem; text-align:center; padding:12px; }
+
+/* Changelog */
+.changelog-wrap { padding:0 24px 32px; }
+.changelog-inner { background:#fff; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.07); overflow:hidden; }
+.cl-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); }
+.cl-head h3 { font-size:.9rem; font-weight:800; color:var(--navy); }
+.cl-list { max-height:260px; overflow-y:auto; }
+.cl-item { display:flex; gap:10px; padding:9px 18px; border-bottom:1px solid var(--border); font-size:.77rem; }
+.cl-item:last-child { border-bottom:none; }
+.cl-ico { flex-shrink:0; font-size:.95rem; }
+.cl-msg { color:#334155; font-weight:600; flex:1; }
+.cl-time { color:#94a3b8; font-size:.67rem; white-space:nowrap; margin-top:2px; }
+.cl-empty { text-align:center; color:#cbd5e1; padding:20px; font-size:.8rem; }
+.section-gap { height:24px; }
+
+/* ── Modals ── */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:999; align-items:center; justify-content:center; backdrop-filter:blur(5px); }
+.modal-overlay.active { display:flex; }
+.modal { background:#fff; border-radius:18px; padding:28px; width:420px; max-width:96vw; box-shadow:0 24px 64px rgba(0,0,0,.28); animation:popIn .18s ease; }
+.modal-wide { width:520px; }
+@keyframes popIn { from{transform:scale(.9);opacity:0} to{transform:scale(1);opacity:1} }
+.modal h2    { font-size:1rem; margin-bottom:16px; color:var(--navy); font-weight:800; }
+.modal label { font-size:.78rem; font-weight:700; color:#64748b; display:block; margin:11px 0 3px; }
+.modal input[type=text],
+.modal input[type=date],
+.modal input[type=number],
+.modal select,
+.modal textarea { width:100%; padding:10px 12px; border:1.5px solid #e2e8f0; border-radius:10px; font-size:.88rem; outline:none; font-family:inherit; color:#1a2e4a; transition:border-color .15s; }
+.modal input:focus,.modal select:focus,.modal textarea:focus { border-color:var(--accent); }
+.modal textarea { resize:vertical; min-height:72px; }
+.modal-actions { display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; }
+.modal-actions .btn { flex:1; justify-content:center; min-width:80px; }
+.modal-divider { border:none; border-top:1px solid #f1f5f9; margin:16px 0; }
+.pd-name { font-size:1.1rem; font-weight:800; color:var(--navy); margin-bottom:3px; }
+.pd-meta { font-size:.78rem; color:#94a3b8; margin-bottom:12px; }
+.note-display { background:#fffbea; border:1px solid #fde68a; border-radius:8px; padding:10px 13px; font-size:.82rem; color:#555; margin-bottom:10px; white-space:pre-wrap; line-height:1.5; }
+
+/* Toggle */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding:11px 14px; background:#f8fafc; border-radius:10px; border:1.5px solid #e2e8f0; }
+.toggle-lbl { font-size:.82rem; font-weight:700; color:#334155; }
+.toggle-sub { font-size:.7rem; color:#94a3b8; margin-top:1px; }
+.toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; cursor:pointer; inset:0; background:#cbd5e1; border-radius:24px; transition:.3s; }
+.toggle-slider:before { content:""; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; box-shadow:0 1px 4px rgba(0,0,0,.2); }
+.toggle input:checked + .toggle-slider { background:var(--orange); }
+.toggle input:checked + .toggle-slider:before { transform:translateX(20px); }
+
+/* Toast */
+.toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(80px); background:#1a2e4a; color:#fff; padding:11px 24px; border-radius:30px; font-size:.82rem; font-weight:700; z-index:9999; transition:transform .3s ease; pointer-events:none; box-shadow:0 4px 20px rgba(0,0,0,.3); }
+.toast.show { transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <h2>Loading Team Roster…</h2>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar" id="topbar" style="display:none">
+  <div class="topbar-left">
+    <button class="back-btn" id="backBtn" onclick="goToDashboard()">← Metro Overview</button>
+    <div>
+      <div class="topbar-title" id="topbarTitle">🗂 Team Roster</div>
+      <div class="topbar-sub"  id="topbarSub">Metro Strategy</div>
+    </div>
+    <span class="sync-badge" id="syncBadge">● Live</span>
+  </div>
+  <div class="topbar-actions" id="topbarActions">
+    <button class="btn btn-navy btn-sm" onclick="fetchRoster(true)">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     DASHBOARD SCREEN
+════════════════════════════════════════ -->
+<div id="dashScreen">
+  <div class="dash-header">
+    <h2>📍 Metro Strategy Overview</h2>
+    <p>Select a metro to manage its stores and team members.</p>
+  </div>
+  <div class="metro-grid" id="metroGrid"></div>
+</div>
+
+<!-- ════════════════════════════════════════
+     METRO DETAIL SCREEN
+════════════════════════════════════════ -->
+<div id="metroScreen">
+  <div class="metro-detail-header" id="metroDetailHeader">
+    <div>
+      <div class="metro-detail-title" id="metroDetailTitle"></div>
+      <div class="metro-detail-sub"  id="metroDetailSub"></div>
+    </div>
+    <div class="metro-detail-actions">
+      <button class="btn btn-green btn-sm" onclick="openAddModal()">＋ Add Person</button>
+      <button class="btn btn-teal  btn-sm" onclick="toggleChangelog()">📋 Log</button>
+    </div>
+  </div>
+
+  <div class="refresh-bar">
+    <span id="lastRefresh">Auto-refreshes every 30s</span>
+    <button onclick="fetchRoster(true)">Refresh now</button>
+  </div>
+
+  <div class="statsbar" id="statsbar"></div>
+
+  <div class="grid-wrap">
+    <div class="store-grid" id="storeGrid"></div>
+  </div>
+
+  <div class="section-gap"></div>
+
+  <div class="hold-section">
+    <div class="hold-header-bar">⏸ ON HOLD</div>
+    <div class="hold-grid-wrap">
+      <div class="hold-grid" id="holdGrid"></div>
+    </div>
+  </div>
+
+  <div class="section-gap"></div>
+
+  <div class="changelog-wrap" id="changelogWrap" style="display:none">
+    <div class="changelog-inner">
+      <div class="cl-head">
+        <h3>📋 Change Log</h3>
+        <button class="btn btn-gray btn-sm" onclick="toggleChangelog()">Close</button>
+      </div>
+      <div class="cl-list" id="changelogList"></div>
+    </div>
+  </div>
+  <div class="section-gap"></div>
+</div>
+
+<!-- ══ MODALS ═══════════════════════════════ -->
+
+<!-- Add Person -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <h2>＋ Add Person</h2>
+    <label>Full Name</label>
+    <input type="text" id="addName" placeholder="Jane Smith" />
+    <label>Start Date</label>
+    <input type="date" id="addDate" />
+    <label>Store / Location</label>
+    <select id="addLoc"></select>
+    <label>Notes (optional)</label>
+    <textarea id="addNote" placeholder="Any notes about this person…"></textarea>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-lbl">Add to ON HOLD instead</div>
+        <div class="toggle-sub">Skip active roster, place directly on hold</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="addToHold"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-gray"  onclick="closeModal('addModal')">Cancel</button>
+      <button class="btn btn-green" onclick="addPerson()">Add Person</button>
+    </div>
+  </div>
+</div>
+
+<!-- Person Detail -->
+<div class="modal-overlay" id="personModal">
+  <div class="modal modal-wide">
+    <div class="pd-name" id="pdName"></div>
+    <div class="pd-meta" id="pdMeta"></div>
+    <div id="pdNoteDisplay" class="note-display" style="display:none"></div>
+    <hr class="modal-divider">
+    <label>Edit Name</label>
+    <input type="text" id="pdEditName" />
+    <label>Edit Start Date</label>
+    <input type="date" id="pdEditDate" />
+    <label>Notes / Comments</label>
+    <textarea id="pdEditNote" placeholder="Add a note…"></textarea>
+    <hr class="modal-divider">
+    <div class="modal-actions">
+      <button class="btn btn-gray"   onclick="closeModal('personModal')">Cancel</button>
+      <button class="btn btn-green"  onclick="savePerson()">💾 Save</button>
+      <button class="btn btn-orange" onclick="movePersonToHold()">⏸ Move to HOLD</button>
+      <button class="btn btn-red"    onclick="removePerson()">🗑 Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hold Person Detail -->
+<div class="modal-overlay" id="holdPersonModal">
+  <div class="modal modal-wide">
+    <div class="pd-name" id="hpdName"></div>
+    <div class="pd-meta" id="hpdMeta"></div>
+    <div id="hpdNoteDisplay" class="note-display" style="display:none"></div>
+    <hr class="modal-divider">
+    <label>Notes / Comments</label>
+    <textarea id="hpdNote" placeholder="Add notes…"></textarea>
+    <label>Restore to Store</label>
+    <select id="hpdRestoreLoc"></select>
+    <div class="modal-actions">
+      <button class="btn btn-gray"   onclick="closeModal('holdPersonModal')">Cancel</button>
+      <button class="btn btn-green"  onclick="saveHoldNote()">💾 Save Note</button>
+      <button class="btn btn-purple" onclick="restoreFromHold()">↩ Restore</button>
+      <button class="btn btn-red"    onclick="removeFromHold()">🗑 Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- Headcount -->
+<div class="modal-overlay" id="hcModal">
+  <div class="modal">
+    <h2>🎯 Set Headcount Target</h2>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:12px">Target for <strong id="hcModalLoc"></strong></p>
+    <label>Target Number</label>
+    <input type="number" id="hcInput" min="0" max="999" placeholder="e.g. 9" style="font-size:1.4rem;font-weight:900;text-align:center;" />
+    <div class="modal-actions">
+      <button class="btn btn-gray"  onclick="closeModal('hcModal')">Cancel</button>
+      <button class="btn btn-green" onclick="saveHeadcount()">Set Target</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const REPO_OWNER = 'alemcanales';
+const REPO_NAME  = 'team-roster';
+const FILE_PATH  = 'roster.json';
+const BRANCH     = 'main';
+const TOKEN      = atob("Z2l0aHViX3BhdF8xMUNGRkxXWUkwQThVdFhXYm9NaHEwX1Z6SkFxY1BhSHlqUl"+"lYSnE5Skt4TzJQZ2txVzA3aTVmMzR1ZWNjaUNzZjVBT0kySkpIWFh2NHd0SEN0");
+
+// ── Metro Definitions ────────────────────────────────────────────────────────
+const METROS = [
+  {
+    id:      'houston',
+    name:    'Houston Metro',
+    icon:    '🚀',
+    theme:   'metro-houston',
+    badge:   'linear-gradient(90deg,#1a2e4a,#2e86de)',
+    stores:  ['Memorial City','Houston Galleria','First Colony','Willowbrook','The Woodlands','Highland Village','Baybrook']
+  },
+  {
+    id:      'austin',
+    name:    'Austin Metro',
+    icon:    '🎸',
+    theme:   'metro-austin',
+    badge:   'linear-gradient(90deg,#134e4a,#0d9488)',
+    stores:  ['Barton Creek','Domain NORTHSIDE']
+  },
+  {
+    id:      'sa',
+    name:    'San Antonio Metro',
+    icon:    '🌵',
+    theme:   'metro-sa',
+    badge:   'linear-gradient(90deg,#581c87,#7c3aed)',
+    stores:  ['North Star','La Cantera']
+  },
+  {
+    id:      'dfw',
+    name:    'DFW Metro',
+    icon:    '⭐',
+    theme:   'metro-dfw',
+    badge:   'linear-gradient(90deg,#7c2d12,#ea580c)',
+    stores:  ['University Park Village','Knox Street','Galleria Dallas','Northpark']
+  },
+  {
+    id:      'arizona',
+    name:    'Arizona Metro',
+    icon:    '🌄',
+    theme:   'metro-arizona',
+    badge:   'linear-gradient(90deg,#713f12,#ca8a04)',
+    stores:  ['La Encantada']
+  }
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let fileSha      = '';
+let state        = { headcounts:{}, roster:{}, hold:{} };
+let changelog    = JSON.parse(localStorage.getItem('roster_changelog')||'[]');
+let sortState    = {};
+let autoTimer    = null;
+let currentMetro = null;   // active metro object
+let ctx          = { loc:'', idx:-1 };
+
+// ── GitHub ───────────────────────────────────────────────────────────────────
+async function ghFetch(path, opts={}) {
+  return fetch(`https://api.github.com${path}`, {
+    ...opts,
+    headers:{ 'Authorization':`Bearer ${TOKEN}`, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', ...(opts.headers||{}) }
+  });
+}
+
+async function fetchRoster(showToast=false) {
+  setSyncBadge('syncing','⟳ Syncing…');
+  try {
+    const res  = await ghFetch(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}?ref=${BRANCH}&t=${Date.now()}`);
+    const json = await res.json();
+    fileSha    = json.sha;
+    state      = JSON.parse(atob(json.content.replace(/\n/g,'')));
+    if (!state.headcounts) state.headcounts = {};
+    // ensure all stores exist
+    METROS.forEach(m => m.stores.forEach(s => {
+      if (!state.roster[s])     state.roster[s]     = [];
+      if (!state.hold[s])       state.hold[s]       = [];
+      if (state.headcounts[s]==null) state.headcounts[s] = 0;
+    }));
+    setSyncBadge('saved','● Live');
+    document.getElementById('lastRefresh').textContent = `Last synced: ${new Date().toLocaleTimeString()} — auto-refreshes every 30s`;
+    if (showToast) toast('✅ Roster refreshed');
+    // Show UI
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('topbar').style.display        = 'flex';
+    if (currentMetro) { renderMetroDetail(currentMetro); }
+    else              { renderDashboard(); showScreen('dash'); }
+    if (!autoTimer) autoTimer = setInterval(()=>fetchRoster(false), 30000);
+  } catch(e) {
+    setSyncBadge('error','✕ Error');
+    toast('❌ Could not load: '+e.message);
+  }
+}
+
+async function saveRoster(msg, icon='✏️') {
+  setSyncBadge('syncing','⟳ Saving…');
+  try {
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(state,null,2))));
+    const res = await ghFetch(`/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ message:msg, content, sha:fileSha, branch:BRANCH })
+    });
+    if (res.status===409) { toast('⚠️ Conflict — re-syncing…'); await fetchRoster(false); return; }
+    if (!res.ok) { const e=await res.json(); throw new Error(e.message); }
+    const data = await res.json();
+    fileSha = data.content.sha;
+    setSyncBadge('saved','✓ Saved');
+    setTimeout(()=>setSyncBadge('saved','● Live'),2000);
+    addToChangelog(icon, msg);
+    toast(msg);
+    // refresh dashboard card if visible
+    if (!currentMetro) renderDashboard();
+  } catch(e) {
+    setSyncBadge('error','✕ Save failed');
+    toast('❌ '+e.message);
+  }
+}
+
+// ── Screen routing ───────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.getElementById('dashScreen').style.display   = name==='dash'   ? 'block' : 'none';
+  document.getElementById('metroScreen').style.display  = name==='metro'  ? 'block' : 'none';
+  document.getElementById('backBtn').style.display      = name==='metro'  ? 'flex'  : 'none';
+}
+
+function openMetro(metroId) {
+  currentMetro = METROS.find(m=>m.id===metroId);
+  renderMetroDetail(currentMetro);
+  showScreen('metro');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goToDashboard() {
+  currentMetro = null;
+  renderDashboard();
+  showScreen('dash');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  document.getElementById('topbarTitle').textContent = '🗂 Team Roster';
+  document.getElementById('topbarSub').textContent   = 'Metro Strategy Overview';
+  document.getElementById('topbarActions').innerHTML = `<button class="btn btn-navy btn-sm" onclick="fetchRoster(true)">⟳ Refresh</button>`;
+
+  document.getElementById('metroGrid').innerHTML = METROS.map(m => {
+    const totalRoster = m.stores.reduce((s,st)=>(s+(state.roster[st]||[]).length),0);
+    const totalHold   = m.stores.reduce((s,st)=>(s+(state.hold[st]||[]).length),0);
+    const totalTarget = m.stores.reduce((s,st)=>(s+(state.headcounts[st]||0)),0);
+    const fracCls     = totalTarget ? (totalRoster>totalTarget?'over':totalRoster===totalTarget?'full':'') : '';
+    const fracStr     = totalTarget ? `${totalRoster}/${totalTarget}` : `${totalRoster}`;
+    const pct         = totalTarget ? Math.min(100,Math.round(totalRoster/totalTarget*100)) : 0;
+    const storeChips  = m.stores.map(s=>`<span class="store-chip">${s}</span>`).join('');
+
+    return `<div class="metro-card ${m.theme}" onclick="openMetro('${m.id}')">
+      <div class="metro-card-header">
+        <div>
+          <div class="metro-icon">${m.icon}</div>
+          <div class="metro-name">${m.name}</div>
+          <div class="metro-store-count">${m.stores.length} store${m.stores.length!==1?'s':''}</div>
+        </div>
+        <div class="metro-arrow">→</div>
+      </div>
+      <div class="metro-card-body">
+        <div class="metro-stores-list">${storeChips}</div>
+        <div class="metro-stats">
+          <div class="mstat">
+            <div class="mstat-num ${fracCls}">${fracStr}</div>
+            <div class="mstat-lbl">headcount</div>
+          </div>
+          <div class="mstat">
+            <div class="mstat-num">${totalHold}</div>
+            <div class="mstat-lbl">on hold</div>
+          </div>
+          <div class="mstat">
+            <div class="mstat-num">${m.stores.reduce((s,st)=>s+(state.roster[st]||[]).filter(p=>p.note).length,0)}</div>
+            <div class="mstat-lbl">with notes</div>
+          </div>
+        </div>
+        ${totalTarget?`<div style="margin-top:10px"><div class="progress-bar"><div class="progress-fill ${fracCls}" style="width:${pct}%"></div></div></div>`:''}
+      </div>
+      <div class="metro-card-footer">
+        <button class="open-metro-btn">Open Metro →</button>
+        ${totalHold?`<span class="hold-pill">⏸ ${totalHold} on hold</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Metro Detail ─────────────────────────────────────────────────────────────
+function renderMetroDetail(metro) {
+  document.getElementById('topbarTitle').textContent  = metro.icon+' '+metro.name;
+  document.getElementById('topbarSub').textContent    = metro.stores.length+' stores';
+  document.getElementById('topbarActions').innerHTML  = `
+    <button class="btn btn-green btn-sm" onclick="openAddModal()">＋ Add Person</button>
+    <button class="btn btn-teal  btn-sm" onclick="toggleChangelog()">📋 Log</button>
+    <button class="btn btn-navy  btn-sm" onclick="fetchRoster(true)">⟳ Refresh</button>`;
+
+  // Detail header badge
+  document.getElementById('metroDetailTitle').textContent = metro.icon+' '+metro.name;
+  document.getElementById('metroDetailSub').textContent   = metro.stores.join(' · ');
+
+  // Stats
+  renderStats(metro);
+
+  // Store grid — columns per store count
+  const cols = Math.min(metro.stores.length, 4);
+  const grid = document.getElementById('storeGrid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(200px,1fr))`;
+  grid.className = `store-grid ${metro.theme}`;
+  grid.innerHTML = metro.stores.map(store => renderStoreCard(store, metro)).join('');
+
+  // Hold
+  const holdGrid = document.getElementById('holdGrid');
+  holdGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(200px,1fr))`;
+  holdGrid.innerHTML = metro.stores.map(store => {
+    const people = state.hold[store]||[];
+    const rows   = people.length
+      ? people.map((p,i)=>`<div class="hold-person" onclick="openHoldPersonModal('${x(store)}',${i})"><div><div class="hold-name">${x(p.name)}${p.note?'<span class="person-note-icon">📝</span>':''}</div><div class="hold-date">${x(p.date||'—')}</div></div></div>`).join('')
+      : '<div class="empty-hold">— empty —</div>';
+    return `<div class="hold-card"><div class="hold-card-header">${store}</div>${rows}</div>`;
+  }).join('');
+
+  // Populate store selects
+  populateLocSelects(metro.stores);
+}
+
+function renderStoreCard(store, metro) {
+  const people = state.roster[store]||[];
+  const sorted = getSorted(people, store);
+  const target = state.headcounts[store]||0;
+  const count  = people.length;
+  const pct    = target ? Math.min(100,Math.round(count/target*100)) : 0;
+  const fCls   = target&&count>target?'over':target&&count===target?'full':'';
+  const snA    = (sortState[store]?.field==='name')?'active':'';
+  const sdA    = (sortState[store]?.field==='date')?'active':'';
+
+  const rows = sorted.map(p => {
+    const oi = people.findIndex(q=>q===p);
+    return `<div class="person-row" onclick="openPersonModal('${x(store)}',${oi})">
+      <div class="person-name">${x(p.name)}${p.note?'<span class="person-note-icon">📝</span>':''}</div>
+      <div class="date-badge">${x(p.date||'—')}</div>
+    </div>`;
+  }).join('') || '<div class="empty-col">No people yet</div>';
+
+  return `<div class="loc-card">
+    <div class="loc-header">${store}</div>
+    <div class="sort-bar">
+      <span>NAME</span>
+      <button class="sort-btn ${snA}" onclick="toggleSort('${x(store)}','name')">${si(store,'name')} Name</button>
+      <button class="sort-btn ${sdA}" onclick="toggleSort('${x(store)}','date')">${si(store,'date')} Date</button>
+    </div>
+    ${rows}
+    <div class="hc-bar">
+      <div class="hc-top">
+        <div>
+          <div class="hc-fraction ${fCls}">${target?`${count}/${target}`:count}</div>
+          <div class="hc-lbl">headcount${target?' target':''}</div>
+        </div>
+        <button class="btn btn-navy btn-sm" onclick="openHcModal('${x(store)}')">Set Target</button>
+      </div>
+      ${target?`<div class="progress-bar"><div class="progress-fill ${fCls}" style="width:${pct}%"></div></div>`:''}
+    </div>
+    <button class="add-row-btn" onclick="openAddModalFor('${x(store)}')">＋ Add Person</button>
+  </div>`;
+}
+
+function renderStats(metro) {
+  document.getElementById('statsbar').innerHTML = metro.stores.map(store => {
+    const count  = (state.roster[store]||[]).length;
+    const target = state.headcounts[store]||0;
+    const cls    = target?(count>target?'over':count===target?'full':''):'';
+    return `<div class="stat-card"><div class="stat-loc" title="${store}">${store}</div><div class="stat-frac ${cls}">${target?`${count}/${target}`:count}</div><div class="stat-lbl">${target?'headcount':'no target'}</div></div>`;
+  }).join('');
+}
+
+// ── Sort ─────────────────────────────────────────────────────────────────────
+function getSorted(people, store) {
+  const s = sortState[store];
+  if (!s) return [...people];
+  return [...people].sort((a,b)=>{
+    const va = s.field==='name'?a.name.toLowerCase():(a.date||'');
+    const vb = s.field==='name'?b.name.toLowerCase():(b.date||'');
+    return va<vb?(s.dir==='asc'?-1:1):va>vb?(s.dir==='asc'?1:-1):0;
+  });
+}
+function toggleSort(store, field) {
+  const cur = sortState[store];
+  sortState[store] = { field, dir:cur&&cur.field===field&&cur.dir==='asc'?'desc':'asc' };
+  if (currentMetro) renderMetroDetail(currentMetro);
+}
+function si(store, field) {
+  const s=sortState[store]; return (!s||s.field!==field)?'↕':s.dir==='asc'?'↑':'↓';
+}
+
+// ── Add Person ────────────────────────────────────────────────────────────────
+async function addPerson() {
+  const name   = document.getElementById('addName').value.trim();
+  const dateRaw= document.getElementById('addDate').value;
+  const loc    = document.getElementById('addLoc').value;
+  const toHold = document.getElementById('addToHold').checked;
+  const note   = document.getElementById('addNote').value.trim();
+  if (!name)    { toast('⚠️ Name required'); return; }
+  if (!dateRaw) { toast('⚠️ Start date required'); return; }
+  const [,m,d] = dateRaw.split('-');
+  const displayDate = `${parseInt(m)}/${parseInt(d)}`;
+  const person = {name, date:displayDate, note};
+  if (toHold) { if(!state.hold[loc]) state.hold[loc]=[]; state.hold[loc].push(person); }
+  else        { if(!state.roster[loc]) state.roster[loc]=[]; state.roster[loc].push(person); }
+  closeModal('addModal');
+  document.getElementById('addName').value='';
+  document.getElementById('addDate').value='';
+  document.getElementById('addNote').value='';
+  document.getElementById('addToHold').checked=false;
+  if (currentMetro) renderMetroDetail(currentMetro);
+  await saveRoster(`➕ Added ${name} to ${toHold?'HOLD ('+loc+')':loc}`,'➕');
+}
+function openAddModal()       { document.getElementById('addModal').classList.add('active'); }
+function openAddModalFor(store){ openAddModal(); document.getElementById('addLoc').value=store; }
+
+// ── Person Modal ──────────────────────────────────────────────────────────────
+function openPersonModal(store, idx) {
+  ctx={loc:store, idx};
+  const p=state.roster[store][idx];
+  document.getElementById('pdName').textContent=p.name;
+  document.getElementById('pdMeta').textContent=`${store} · Start: ${p.date||'—'}`;
+  document.getElementById('pdEditName').value=p.name;
+  document.getElementById('pdEditDate').value=displayToISO(p.date);
+  document.getElementById('pdEditNote').value=p.note||'';
+  const nd=document.getElementById('pdNoteDisplay');
+  if(p.note&&p.note.trim()){nd.textContent=p.note;nd.style.display='block';}else nd.style.display='none';
+  document.getElementById('personModal').classList.add('active');
+}
+function savePerson() {
+  const name=document.getElementById('pdEditName').value.trim();
+  const dateRaw=document.getElementById('pdEditDate').value;
+  const note=document.getElementById('pdEditNote').value.trim();
+  if(!name){toast('⚠️ Name required');return;}
+  const displayDate=dateRaw?isoToDisplay(dateRaw):'';
+  const p=state.roster[ctx.loc][ctx.idx];
+  p.name=name;p.date=displayDate;p.note=note;
+  closeModal('personModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`✏️ Updated ${name} in ${ctx.loc}`,'✏️');
+}
+function movePersonToHold() {
+  const p=state.roster[ctx.loc][ctx.idx];
+  if(!confirm(`Move ${p.name} to ON HOLD?`))return;
+  state.roster[ctx.loc].splice(ctx.idx,1);
+  if(!state.hold[ctx.loc]) state.hold[ctx.loc]=[];
+  state.hold[ctx.loc].push({name:p.name,date:p.date,note:p.note||''});
+  closeModal('personModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`⏸ Moved ${p.name} to HOLD`,'⏸');
+}
+function removePerson() {
+  const p=state.roster[ctx.loc][ctx.idx];
+  if(!confirm(`Permanently remove ${p.name}?`))return;
+  state.roster[ctx.loc].splice(ctx.idx,1);
+  closeModal('personModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`🗑 Removed ${p.name} from ${ctx.loc}`,'🗑');
+}
+
+// ── Hold Person Modal ─────────────────────────────────────────────────────────
+function openHoldPersonModal(store, idx) {
+  ctx={loc:store, idx};
+  const p=state.hold[store][idx];
+  document.getElementById('hpdName').textContent=p.name;
+  document.getElementById('hpdMeta').textContent=`ON HOLD · ${store} · ${p.date||'—'}`;
+  document.getElementById('hpdNote').value=p.note||'';
+  const nd=document.getElementById('hpdNoteDisplay');
+  if(p.note&&p.note.trim()){nd.textContent=p.note;nd.style.display='block';}else nd.style.display='none';
+  if(currentMetro) populateLocSelects(currentMetro.stores);
+  document.getElementById('hpdRestoreLoc').value=store;
+  document.getElementById('holdPersonModal').classList.add('active');
+}
+function saveHoldNote() {
+  const note=document.getElementById('hpdNote').value.trim();
+  state.hold[ctx.loc][ctx.idx].note=note;
+  closeModal('holdPersonModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`📝 Note updated for ${state.hold[ctx.loc][ctx.idx].name}`,'📝');
+}
+function restoreFromHold() {
+  const p=state.hold[ctx.loc][ctx.idx];
+  const toLoc=document.getElementById('hpdRestoreLoc').value;
+  state.hold[ctx.loc].splice(ctx.idx,1);
+  if(!state.roster[toLoc]) state.roster[toLoc]=[];
+  state.roster[toLoc].push({name:p.name,date:p.date,note:p.note||''});
+  closeModal('holdPersonModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`↩ Restored ${p.name} to ${toLoc}`,'↩');
+}
+function removeFromHold() {
+  const p=state.hold[ctx.loc][ctx.idx];
+  if(!confirm(`Permanently remove ${p.name} from HOLD?`))return;
+  state.hold[ctx.loc].splice(ctx.idx,1);
+  closeModal('holdPersonModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`🗑 Removed ${p.name} from HOLD`,'🗑');
+}
+
+// ── Headcount Modal ───────────────────────────────────────────────────────────
+function openHcModal(store) {
+  ctx={loc:store,idx:-1};
+  document.getElementById('hcModalLoc').textContent=store;
+  document.getElementById('hcInput').value=state.headcounts[store]||'';
+  document.getElementById('hcModal').classList.add('active');
+}
+function saveHeadcount() {
+  const val=parseInt(document.getElementById('hcInput').value);
+  if(isNaN(val)||val<0){toast('⚠️ Enter a valid number');return;}
+  state.headcounts[ctx.loc]=val;
+  closeModal('hcModal');
+  if(currentMetro) renderMetroDetail(currentMetro);
+  saveRoster(`🎯 Set headcount for ${ctx.loc} to ${val}`,'🎯');
+}
+
+// ── Changelog ─────────────────────────────────────────────────────────────────
+function addToChangelog(icon, msg) {
+  changelog.unshift({icon,msg,time:new Date().toLocaleString()});
+  if(changelog.length>100) changelog=changelog.slice(0,100);
+  localStorage.setItem('roster_changelog',JSON.stringify(changelog));
+  renderChangelog();
+}
+function renderChangelog() {
+  const el=document.getElementById('changelogList');
+  if(!el) return;
+  el.innerHTML=changelog.length
+    ? changelog.map(c=>`<div class="cl-item"><span class="cl-ico">${c.icon}</span><div style="flex:1"><div class="cl-msg">${x(c.msg)}</div><div class="cl-time">${x(c.time)}</div></div></div>`).join('')
+    : '<div class="cl-empty">No changes yet.</div>';
+}
+function toggleChangelog() {
+  const w=document.getElementById('changelogWrap');
+  const show=w.style.display==='none';
+  w.style.display=show?'block':'none';
+  if(show){renderChangelog();w.scrollIntoView({behavior:'smooth'});}
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function populateLocSelects(stores) {
+  ['addLoc','hpdRestoreLoc'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    const cur=el.value;
+    el.innerHTML=(stores||[]).map(s=>`<option value="${s}">${s}</option>`).join('');
+    if(cur&&(stores||[]).includes(cur)) el.value=cur;
+  });
+}
+function displayToISO(d) {
+  if(!d) return '';
+  const p=d.split('/');
+  if(p.length!==2) return '';
+  return `${new Date().getFullYear()}-${String(parseInt(p[0])).padStart(2,'0')}-${String(parseInt(p[1])).padStart(2,'0')}`;
+}
+function isoToDisplay(iso) {
+  if(!iso) return '';
+  const [,m,d]=iso.split('-');
+  return `${parseInt(m)}/${parseInt(d)}`;
+}
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('active');}));
+function setSyncBadge(t,txt){const b=document.getElementById('syncBadge');b.className=`sync-badge ${t}`;b.textContent=txt;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function x(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+fetchRoster(false);
+</script>
+</body>
+</html>
